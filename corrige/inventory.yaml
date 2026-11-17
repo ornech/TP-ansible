@@ -1,0 +1,10 @@
+---
+# Inventaire du TP : une VM, dans le groupe ma_vm_ansible
+all:
+  vars:
+    ansible_user: etudiant            # compte SSH, valable pour toutes les machines
+  children:
+    ma_vm_ansible:                    # groupe visé par les playbooks (hosts: ma_vm_ansible)
+      hosts:
+        mavm:                         # nom de la VM dans Ansible (surnom libre)
+          ansible_host: 192.168.1.155 # adresse IP réelle de la VM

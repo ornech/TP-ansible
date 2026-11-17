@@ -1,0 +1,11 @@
+[Container]
+Image={{ nginx_image }}
+ContainerName={{ item }}
+Network=back.network
+Volume=/opt/tp/{{ item }}:/usr/share/nginx/html:ro
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

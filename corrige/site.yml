@@ -1,0 +1,189 @@
+---
+# Corrigé du TP : état final après l'étape 5.
+# Les commentaires « étape N » indiquent quand chaque bloc apparaît.
+- name: Déployer la pile web
+  hosts: ma_vm_ansible
+  become: true
+
+  vars:
+    message: Bonjour                                    # étape 4.1
+    nginx_image: docker.io/library/nginx:alpine         # étape 4.3
+
+  tasks:
+    # ---------- étape 2
+    - name: Vérifier que la VM est une Debian 13 ou plus
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Debian'
+          - ansible_facts['distribution_major_version'] | int >= 13
+        fail_msg: Quadlet demande Debian 13 minimum
+
+    - name: Installer Podman
+      ansible.builtin.apt:
+        name: podman
+        state: present
+        update_cache: true
+
+    # ---------- étape 3 (tp.network) et 5.3 (back.network)
+    - name: Déposer le réseau tp
+      ansible.builtin.copy:
+        dest: /etc/containers/systemd/tp.network
+        mode: "0644"
+        content: |
+          [Network]
+
+    - name: Déposer le réseau back (interne)
+      ansible.builtin.copy:
+        dest: /etc/containers/systemd/back.network
+        mode: "0644"
+        content: |
+          [Network]
+          Internal=true
+
+    # ---------- étape 4.1, factorisé à l'étape 5.2
+    - name: Créer les dossiers
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /opt/tp/web1
+        - /opt/tp/haproxy
+
+    - name: Générer la page d'accueil
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: /opt/tp/web1/index.html
+        mode: "0644"
+
+    # ---------- étape 3 (copy), 4.2 (notify), 4.3 (template), 5.3 (réseau back)
+    - name: Déposer le conteneur web1
+      ansible.builtin.template:
+        src: web1.container.j2
+        dest: /etc/containers/systemd/web1.container
+        mode: "0644"
+      notify: Redémarrer web1
+
+    - name: Démarrer web1
+      ansible.builtin.systemd_service:
+        name: web1.service
+        state: started
+        daemon_reload: true
+
+    # ---------- étape 5.1
+    - name: Déposer haproxy.cfg
+      ansible.builtin.copy:
+        dest: /opt/tp/haproxy/haproxy.cfg
+        mode: "0644"
+        content: |
+          defaults
+              mode http
+              timeout connect 5s
+              timeout client  30s
+              timeout server  30s
+
+          frontend entree
+              bind *:8080
+              default_backend serveurs_web
+
+          backend serveurs_web
+              server web1 web1:80 check
+      notify: Redémarrer haproxy
+
+    - name: Déposer le conteneur haproxy
+      ansible.builtin.copy:
+        dest: /etc/containers/systemd/haproxy.container
+        mode: "0644"
+        content: |
+          [Unit]
+          Requires=web1.service
+          After=web1.service
+
+          [Container]
+          Image=docker.io/library/haproxy:lts-alpine
+          ContainerName=haproxy
+          Network=tp.network
+          Network=back.network
+          PublishPort=80:8080
+          Volume=/opt/tp/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+          [Service]
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Redémarrer haproxy
+
+    - name: Démarrer haproxy
+      ansible.builtin.systemd_service:
+        name: haproxy.service
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Redémarrer web1
+      ansible.builtin.systemd_service:
+        name: web1.service
+        state: restarted
+        daemon_reload: true
+
+    - name: Redémarrer haproxy
+      ansible.builtin.systemd_service:
+        name: haproxy.service
+        state: restarted
+        daemon_reload: true
+
+- name: Contrôles
+  hosts: ma_vm_ansible
+  tags: controles
+  tasks:
+    # ---------- étape 2
+    - name: Lire la version de Podman
+      ansible.builtin.command: podman --version
+      register: podman_version
+      changed_when: false
+
+    - name: Vérifier que Podman est en version 5
+      ansible.builtin.assert:
+        that: "'version 5' in podman_version.stdout"
+
+    # ---------- étape 3
+    - name: Lire l'état des services
+      ansible.builtin.service_facts:
+
+    - name: Vérifier que web1 et haproxy tournent
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['web1.service'].state == 'running'
+          - ansible_facts.services['haproxy.service'].state == 'running'
+
+    # ---------- étapes 3 et 4 sur le port 8081, puis 5.1 sur le port 80
+    - name: Attendre le port 80
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 80
+        timeout: 30
+      delegate_to: localhost
+
+    - name: Lire la page via haproxy
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}"
+        return_content: true
+      delegate_to: localhost
+      register: via_haproxy
+
+    - name: Vérifier que la page est celle de web1
+      ansible.builtin.assert:
+        that: inventory_hostname in via_haproxy.content
+
+    # ---------- étape 5.3
+    - name: Vérifier que seuls haproxy et SSH répondent
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ item }}"
+        state: stopped
+        timeout: 5
+      delegate_to: localhost
+      loop:
+        - 8080
+        - 8081

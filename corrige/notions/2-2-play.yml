@@ -1,0 +1,17 @@
+---
+# Un play associe des machines (hosts) à une liste de tâches (tasks).
+# Un playbook peut contenir plusieurs plays : ils s'exécutent l'un après l'autre.
+- name: Play 1, sur la VM
+  hosts: ma_vm_ansible        # un groupe de l'inventaire
+  become: true                # option du play : ses tâches s'exécutent avec sudo
+  tasks:
+    - name: Où suis-je ?
+      ansible.builtin.debug:
+        msg: "Exécuté sur {{ inventory_hostname }}"
+
+- name: Play 2, sur le poste de contrôle
+  hosts: localhost            # le poste qui lance ansible-playbook
+  tasks:
+    - name: Où suis-je ?
+      ansible.builtin.debug:
+        msg: "Exécuté sur {{ inventory_hostname }}"

@@ -1,0 +1,31 @@
+---
+- name: Déployer la pile web         # un play : hosts = sur qui, tasks = quoi
+  hosts: ma_vm_ansible
+  become: true                       # sudo pour tout le play
+
+  tasks:
+    - name: Vérifier que la VM est une Debian 13 ou plus
+      ansible.builtin.assert:        # échoue si une condition est fausse
+        that:
+          - ansible_facts['distribution'] == 'Debian'
+          - ansible_facts['distribution_major_version'] | int >= 13
+        fail_msg: Quadlet demande Debian 13 minimum
+
+    - name: Installer Podman
+      ansible.builtin.apt:
+        name: ???
+        state: ???
+        update_cache: true
+
+- name: Contrôles                     # second play : vérifie le résultat
+  hosts: ma_vm_ansible
+  tags: controles
+  tasks:
+    - name: Lire la version de Podman
+      ansible.builtin.command: podman --version
+      register: podman_version       # garde le résultat dans une variable
+      changed_when: false            # une lecture ne modifie rien
+
+    - name: Vérifier que Podman est en version 5
+      ansible.builtin.assert:
+        that: "'version 5' in podman_version.stdout"

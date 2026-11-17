@@ -1,0 +1,23 @@
+---
+# Ce playbook produit exprès chacun des compteurs du PLAY RECAP.
+- name: Produire des compteurs
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Tâche sans effet (ok)
+      ansible.builtin.debug:
+        msg: "ok"
+
+    - name: Déposer un fichier (changed la 1re fois, ok ensuite)
+      ansible.builtin.copy:
+        dest: /tmp/tp-recap.txt
+        content: "recap\n"
+
+    - name: Tâche dont la condition est fausse (skipped)
+      ansible.builtin.debug:
+        msg: "jamais affiché"
+      when: false
+
+    - name: Échec volontaire, seulement avec -e echec=true (failed)
+      ansible.builtin.fail:
+        msg: "Échec provoqué"
+      when: echec | default(false) | bool

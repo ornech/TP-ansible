@@ -1,0 +1,13 @@
+---
+# assert vérifie des conditions. Si l'une est fausse, le playbook s'arrête en erreur.
+# Ici : refuser une machine qui n'est pas une Debian 13 ou plus.
+- name: Précondition
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Vérifier la version de Debian
+      ansible.builtin.assert:
+        that:                                  # toutes les conditions doivent être vraies
+          - ansible_facts['distribution'] == 'Debian'
+          - ansible_facts['distribution_major_version'] | int >= 13   # | int : texte -> nombre
+        fail_msg: Quadlet demande Debian 13 minimum
+        success_msg: Debian 13 ou plus

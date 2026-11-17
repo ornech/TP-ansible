@@ -1,0 +1,14 @@
+---
+# Au début de chaque play, Ansible collecte des « facts » : des informations sur la machine.
+# On les lit avec ansible_facts['nom'].
+# Pour les lister : ansible ma_vm_ansible -m setup
+- name: Lire des facts
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Afficher la distribution et sa version
+      ansible.builtin.debug:
+        msg: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+
+    - name: Afficher la mémoire totale
+      ansible.builtin.debug:
+        msg: "{{ ansible_facts['memtotal_mb'] }} Mo"

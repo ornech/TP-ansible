@@ -1,0 +1,13 @@
+---
+# Une tâche = un nom (name) + un module + les arguments du module.
+# Ce sont les arguments de la ligne de commande ad hoc, écrits un par ligne :
+#   ansible ma_vm_ansible -b -m apt -a "name=tree state=present update_cache=true"
+- name: Gérer un paquet
+  hosts: ma_vm_ansible
+  become: true
+  tasks:
+    - name: S'assurer que tree est installé
+      ansible.builtin.apt:        # le module
+        name: tree                # le paquet à gérer
+        state: present            # l'état voulu : installé. Autres valeurs : absent, latest
+        update_cache: true        # équivaut à apt update

@@ -1,0 +1,19 @@
+[Unit]
+{% for s in serveurs %}
+Requires={{ s }}.service
+After={{ s }}.service
+{% endfor %}
+
+[Container]
+Image=docker.io/library/haproxy:lts-alpine
+ContainerName=haproxy
+Network=tp.network
+Network=back.network
+PublishPort=80:8080
+Volume=/opt/tp/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

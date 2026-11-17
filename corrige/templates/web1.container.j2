@@ -1,0 +1,11 @@
+[Container]
+Image={{ nginx_image }}
+ContainerName=web1
+Network=back.network
+Volume=/opt/tp/web1:/usr/share/nginx/html:ro
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

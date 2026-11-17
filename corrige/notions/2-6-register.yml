@@ -1,0 +1,13 @@
+---
+# register range le résultat d'une tâche dans une variable, réutilisable ensuite.
+- name: Garder un résultat
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Lire la version du noyau
+      ansible.builtin.command: uname -r
+      register: noyau             # le résultat est rangé dans la variable « noyau »
+      changed_when: false         # lire ne modifie rien (sans cette ligne, command compte « changed »)
+
+    - name: Afficher ce qui a été gardé
+      ansible.builtin.debug:
+        msg: "Noyau : {{ noyau.stdout }}"   # stdout = ce que la commande a affiché

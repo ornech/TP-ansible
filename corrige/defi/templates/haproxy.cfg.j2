@@ -1,0 +1,14 @@
+defaults
+    mode http
+    timeout connect 5s
+    timeout client  30s
+    timeout server  30s
+
+frontend entree
+    bind *:8080
+    default_backend serveurs_web
+
+backend serveurs_web
+{% for s in serveurs %}
+    server {{ s }} {{ s }}:80 check
+{% endfor %}

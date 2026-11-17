@@ -1,0 +1,9 @@
+---
+# Un playbook est un fichier YAML qu'on exécute avec : ansible-playbook <fichier>
+# Il commence par --- et contient une liste de plays (chaque play commence par « - »).
+- name: Mon premier playbook
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Dire bonjour depuis la VM
+      ansible.builtin.debug:                  # debug affiche un message
+        msg: "Bonjour depuis {{ inventory_hostname }}"   # nom de la machine dans l'inventaire

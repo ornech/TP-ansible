@@ -1,0 +1,15 @@
+---
+# Un tag étiquette une tâche (ou un play entier).
+# On peut ensuite ne lancer que les tâches étiquetées (--tags), ou les exclure (--skip-tags).
+- name: Tâches étiquetées
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Préparation
+      ansible.builtin.debug:
+        msg: "Préparation"
+      tags: preparation
+
+    - name: Contrôle
+      ansible.builtin.debug:
+        msg: "Contrôle"
+      tags: controles

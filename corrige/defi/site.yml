@@ -1,0 +1,135 @@
+---
+# Corrigé du défi : web1 + web2 derrière haproxy, avec loop.
+# À lancer depuis le dossier corrige/ :  ansible-playbook defi/site.yml
+# Part de l'état final de site.yml : web1 et web1.service gardent leur nom.
+- name: Déployer la pile web (2 nginx)
+  hosts: ma_vm_ansible
+  become: true
+
+  vars:
+    message: Bonjour
+    nginx_image: docker.io/library/nginx:alpine
+    serveurs:
+      - web1
+      - web2
+
+  tasks:
+    - name: Vérifier que la VM est une Debian 13 ou plus
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Debian'
+          - ansible_facts['distribution_major_version'] | int >= 13
+        fail_msg: Quadlet demande Debian 13 minimum
+
+    - name: Installer Podman
+      ansible.builtin.apt:
+        name: podman
+        state: present
+        update_cache: true
+
+    - name: Déposer les réseaux
+      ansible.builtin.copy:
+        dest: "/etc/containers/systemd/{{ item.nom }}.network"
+        mode: "0644"
+        content: "{{ item.contenu }}"
+      loop:
+        - { nom: tp, contenu: "[Network]\n" }
+        - { nom: back, contenu: "[Network]\nInternal=true\n" }
+
+    - name: Créer les dossiers des pages et de haproxy
+      ansible.builtin.file:
+        path: "/opt/tp/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ serveurs + ['haproxy'] }}"
+
+    - name: Générer les pages d'accueil
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: "/opt/tp/{{ item }}/index.html"
+        mode: "0644"
+      loop: "{{ serveurs }}"
+
+    - name: Déposer les conteneurs web
+      ansible.builtin.template:
+        src: web.container.j2
+        dest: "/etc/containers/systemd/{{ item }}.container"
+        mode: "0644"
+      loop: "{{ serveurs }}"
+      notify: Redémarrer les web
+
+    - name: Démarrer les web
+      ansible.builtin.systemd_service:
+        name: "{{ item }}.service"
+        state: started
+        daemon_reload: true
+      loop: "{{ serveurs }}"
+
+    - name: Générer haproxy.cfg
+      ansible.builtin.template:
+        src: haproxy.cfg.j2
+        dest: /opt/tp/haproxy/haproxy.cfg
+        mode: "0644"
+      notify: Redémarrer haproxy
+
+    - name: Déposer le conteneur haproxy
+      ansible.builtin.template:
+        src: haproxy.container.j2
+        dest: /etc/containers/systemd/haproxy.container
+        mode: "0644"
+      notify: Redémarrer haproxy
+
+    - name: Démarrer haproxy
+      ansible.builtin.systemd_service:
+        name: haproxy.service
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Redémarrer les web
+      ansible.builtin.systemd_service:
+        name: "{{ item }}.service"
+        state: restarted
+        daemon_reload: true
+      loop: "{{ serveurs }}"
+
+    - name: Redémarrer haproxy
+      ansible.builtin.systemd_service:
+        name: haproxy.service
+        state: restarted
+        daemon_reload: true
+
+- name: Contrôles
+  hosts: ma_vm_ansible
+  tags: controles
+  tasks:
+    - name: Lire l'état des services
+      ansible.builtin.service_facts:
+
+    - name: Vérifier que les conteneurs tournent
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['web1.service'].state == 'running'
+          - ansible_facts.services['web2.service'].state == 'running'
+          - ansible_facts.services['haproxy.service'].state == 'running'
+
+    - name: Attendre le port 80
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 80
+        timeout: 30
+      delegate_to: localhost
+
+    - name: Interroger haproxy 6 fois
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}"
+        return_content: true
+      delegate_to: localhost
+      loop: [1, 2, 3, 4, 5, 6]
+      register: reponses
+
+    - name: Vérifier que web1 et web2 ont répondu
+      ansible.builtin.assert:
+        that:
+          - reponses.results | selectattr('content', 'search', 'web1') | list | length > 0
+          - reponses.results | selectattr('content', 'search', 'web2') | list | length > 0

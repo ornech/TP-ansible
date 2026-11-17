@@ -1,0 +1,45 @@
+---
+# Remet la VM dans l'état d'avant le TP (pour rejouer la séance).
+# Supprime : conteneurs, unités Quadlet, réseaux, images, /opt/tp, fichiers de /tmp, paquets podman et tree.
+# (tree est installé en 2.3 : sans le retirer, 2.3 n'afficherait plus changed à la 1re exécution.)
+- name: Remettre la VM à zéro
+  hosts: ma_vm_ansible
+  become: true
+  tasks:
+    - name: Arrêter les services
+      ansible.builtin.command: systemctl stop haproxy.service web1.service web2.service  # noqa command-instead-of-module
+      register: arret
+      changed_when: arret.rc == 0
+      failed_when: false
+
+    - name: Supprimer les fichiers Quadlet et les données du TP
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/containers/systemd/haproxy.container
+        - /etc/containers/systemd/web1.container
+        - /etc/containers/systemd/web2.container
+        - /etc/containers/systemd/tp.network
+        - /etc/containers/systemd/back.network
+        - /opt/tp
+        - /tmp/tp-check.txt
+        - /tmp/tp-recap.txt
+
+    - name: Recharger systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Désinstaller Podman et tree
+      ansible.builtin.apt:
+        name:
+          - podman
+          - tree
+        state: absent
+        purge: true
+        autoremove: true
+
+    - name: Supprimer le stockage des conteneurs et des images
+      ansible.builtin.file:
+        path: /var/lib/containers
+        state: absent

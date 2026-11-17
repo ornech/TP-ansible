@@ -1,0 +1,10 @@
+---
+# Avec --check, Ansible simule : il annonce ce qui changerait, sans rien modifier.
+# Avec --diff, il montre en plus le contenu des fichiers modifiés.
+- name: Simulation
+  hosts: ma_vm_ansible
+  tasks:
+    - name: Déposer un fichier
+      ansible.builtin.copy:
+        dest: /tmp/tp-check.txt
+        content: "version 1\n"
